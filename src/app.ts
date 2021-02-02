@@ -13,6 +13,8 @@ import {
 import dotenv from 'dotenv';
 dotenv.config();
 
+//test
+
 const client = new Client();
 
 const prefix = process.env.PREFIX ?? 'p!';

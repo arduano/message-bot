@@ -383,6 +383,18 @@ const commandLibrary: Record<string, CommandHandler> = {
       await msg.channel.send(helpString);
     },
   },
+  send: {
+    name: 'Send in the same channel',
+    description: 'Send a message in the same channel, deleting the original',
+    args: '<...content>',
+    handler: async (content, msg) => {
+      const channel = msg.channel;
+      const attachments = msg.attachments.array();
+      if (content.length === 0 && attachments.length === 0) throw cantSendEmptyMessageError();
+      await channel.send(content, { files: attachments.map(f => f.url) });
+      await msg.delete();
+    },
+  },
   sendc: {
     name: 'Send to channel',
     description: 'Send a message to a specified channel',
@@ -414,18 +426,6 @@ const commandLibrary: Record<string, CommandHandler> = {
       if (remainder.length === 0 && attachments.length === 0) throw cantSendEmptyMessageError();
       const channel = await user.createDM();
       await channel.send(remainder, { files: attachments.map(f => f.url) });
-    },
-  },
-  send: {
-    name: 'Send in the same channel',
-    description: 'Send a message in the same channel, deleting the original',
-    args: '<...content>',
-    handler: async (content, msg) => {
-      const channel = msg.channel;
-      const attachments = msg.attachments.array();
-      if (content.length === 0 && attachments.length === 0) throw cantSendEmptyMessageError();
-      await channel.send(content, { files: attachments.map(f => f.url) });
-      await msg.delete();
     },
   },
   ssend: {

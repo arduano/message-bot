@@ -1,0 +1,28 @@
+{
+    "compilerOptions": {
+      "target": "es6",
+      "moduleResolution": "node",
+      "baseUrl": "./src",
+      "outDir": "./build/",
+      "sourceMap": false,
+      "esModuleInterop": true,
+      "lib": ["es2020", "dom"],
+      "allowJs": true,
+      "skipLibCheck": true,
+      "strict": false,
+      "forceConsistentCasingInFileNames": true,
+      "isolatedModules": true,
+      "jsx": "preserve",
+      "noImplicitAny": true,
+      "resolveJsonModule": true,
+      "strictNullChecks": true,
+      "emitDecoratorMetadata": true,
+      "experimentalDecorators": true,
+      "downlevelIteration": true,
+      "module": "commonjs",
+      "noEmit": true
+    },
+    "include": ["**/*.ts", "**/*.js"],
+    "exclude": ["node_modules"]
+  }
+  

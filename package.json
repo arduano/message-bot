@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@types/dotenv": "^8.2.0",
-    "@types/node": "^14.14.22",
+    "@types/node": "^14.18.21",
     "discord.js": "^12.5.1",
     "dotenv": "^8.2.0",
     "ts-node": "^9.1.1",

@@ -1,4 +1,4 @@
-FROM node:14 as builder
+FROM node:16 builder
 RUN npm install -g typescript ts-node
 
 COPY package.json yarn.lock ./

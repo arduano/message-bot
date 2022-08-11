@@ -1,19 +1,6 @@
-import {
-  Client,
-  Guild,
-  GuildMember,
-  Message,
-  MessageEmbed,
-  MessageOptions,
-  MessageReaction,
-  ReactionEmoji,
-  Role,
-  TextChannel,
-} from 'discord.js';
+import { Client, Message, MessageEmbed, MessageOptions } from 'discord.js';
 import dotenv from 'dotenv';
 dotenv.config();
-
-//test
 
 const client = new Client();
 

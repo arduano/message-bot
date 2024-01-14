@@ -1,8 +1,26 @@
-import { Client, Message, MessageEmbed, MessageOptions } from 'discord.js';
+import {
+  APIEmbed,
+  Client,
+  EmbedBuilder,
+  GatewayIntentBits,
+  IntentsBitField,
+  JSONEncodable,
+  Message,
+  MessageCreateOptions,
+  MessageEditOptions,
+  isJSONEncodable,
+} from 'discord.js';
+import { RawMessageData } from 'discord.js/typings/rawDataTypes';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const client = new Client();
+const client = new Client({
+  intents: [
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+    GatewayIntentBits.Guilds,
+  ],
+});
 
 const prefix = process.env.PREFIX ?? 'p!';
 
@@ -94,11 +112,18 @@ function readNextLine(content: string) {
   };
 }
 
+function jsonDecode<T>(val: T | JSONEncodable<T>): T {
+  if (isJSONEncodable(val)) {
+    return val.toJSON() as T;
+  }
+  return val;
+}
+
 type ArgStore = Record<string, () => Promise<void> | void>;
 async function parseMessageAdvancedArgs(args: string, message: Message, original?: Message) {
   let remainder = args.trim();
   let content = '';
-  let options: MessageOptions = {};
+  let options: MessageCreateOptions | MessageEditOptions = {};
 
   const setContent = (c: string) => {
     checkSet('Content');
@@ -137,7 +162,7 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
       insert: () => {
         content = original.content;
         options = {
-          embed: original.embeds[0],
+          embeds: original.embeds,
         };
       },
     }),
@@ -165,12 +190,12 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
     },
 
     embed: async () => {
-      let embed = new MessageEmbed(options.embed);
-      options.embed = embed;
+      let embed: APIEmbed = jsonDecode(options.embeds?.[0]) ?? {};
+      options.embeds = [embed];
 
       const setEmbedContent = (c: string) => {
         checkSet('Embed content');
-        embed.setDescription(c);
+        embed.description = c;
       };
 
       const embedArgsStore = {
@@ -178,23 +203,32 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
           checkSet('Embed title');
           let title;
           ({ remainder, arg: title } = readNextArg(remainder));
-          embed.setTitle(title);
+          embed.title = title;
         },
 
         footer: () => {
           checkSet('Embed footer');
           let footer;
           ({ remainder, arg: footer } = readNextArg(remainder));
-          embed.setFooter(footer);
+          if (!embed.footer) {
+            embed.footer = { text: footer };
+          } else {
+            embed.footer.text = footer;
+          }
         },
 
         footerme: () => {
           checkSet('Embed footer');
           checkSet('Embed footer icon');
-          embed.setFooter(
-            message.member?.nickname ?? message.author.username,
-            message.author.displayAvatarURL({ format: 'png' }) ?? undefined,
-          );
+          if (!embed.footer) {
+            embed.footer = {
+              text: message.member?.nickname ?? message.author.username,
+              icon_url: message.author.displayAvatarURL({ extension: 'png' }),
+            };
+          } else {
+            embed.footer.text = message.member?.nickname ?? message.author.username;
+            embed.footer.icon_url = message.author.displayAvatarURL({ extension: 'png' });
+          }
         },
 
         footericon: () => {
@@ -204,23 +238,43 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
           }
           let url;
           ({ remainder, arg: url } = readNextArg(remainder));
-          embed.setFooter(embed.footer.text, url);
+          // embed.setFooter(embed.footer.text, url);
+          if (!embed.footer) {
+            embed.footer = {
+              text: '',
+              icon_url: url,
+            };
+          } else {
+            embed.footer.icon_url = url;
+          }
         },
 
         author: () => {
           checkSet('Embed author');
           let author;
           ({ remainder, arg: author } = readNextArg(remainder));
-          embed.setAuthor(author);
+          if (!embed.author) {
+            embed.author = {
+              name: author,
+            };
+          } else {
+            embed.author.name = author;
+          }
         },
 
         authorme: () => {
           checkSet('Embed author');
           checkSet('Embed author icon');
-          embed.setAuthor(
-            message.member?.nickname ?? message.author.username,
-            message.author.displayAvatarURL({ format: 'png' }) ?? undefined,
-          );
+          if (!embed.author) {
+            embed.author = {
+              name: message.member?.nickname ?? message.author.username,
+              icon_url: message.author.displayAvatarURL({ extension: 'png' }) ?? undefined,
+            };
+          } else {
+            embed.author.name = message.member?.nickname ?? message.author.username;
+            embed.author.icon_url =
+              message.author.displayAvatarURL({ extension: 'png' }) ?? undefined;
+          }
         },
 
         authoricon: () => {
@@ -230,7 +284,14 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
           }
           let url;
           ({ remainder, arg: url } = readNextArg(remainder));
-          embed.setAuthor(embed.author?.name, url);
+          if (!embed.author) {
+            embed.author = {
+              name: '',
+              icon_url: url,
+            };
+          } else {
+            embed.author.icon_url = url;
+          }
         },
 
         time: () => {
@@ -247,7 +308,7 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
           } catch {
             throw new CommandError(`Couldn't parse time "${time}"`);
           }
-          embed.setTimestamp(date);
+          embed.timestamp = date.toISOString();
         },
 
         c: () => embedArgsStore.content(),
@@ -263,7 +324,7 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
           checkSet('Embed url');
           let url;
           ({ remainder, arg: url } = readNextArg(remainder));
-          embed.setURL(parseUrl(url));
+          embed.url = parseUrl(url);
         },
 
         col: () => embedArgsStore.color(),
@@ -271,7 +332,7 @@ async function parseMessageAdvancedArgs(args: string, message: Message, original
           checkSet('Embed color');
           let col;
           ({ remainder, arg: col } = readNextArg(remainder));
-          embed.setColor(col);
+          embed.color = parseInt(col, 16);
         },
 
         rest: () => {
@@ -310,7 +371,10 @@ async function parseChannel(data: string) {
 
 async function parseTextChannel(data: string) {
   const channel = await parseChannel(data);
-  if (!channel.isText()) {
+  if (!channel) {
+    return null;
+  }
+  if (!channel.isTextBased()) {
     throw new CommandError(`That channel isn't a text channel`);
   }
   return channel;
@@ -376,9 +440,9 @@ const commandLibrary: Record<string, CommandHandler> = {
     args: '<...content>',
     handler: async (content, msg) => {
       const channel = msg.channel;
-      const attachments = msg.attachments.array();
+      const attachments = [...msg.attachments.values()];
       if (content.length === 0 && attachments.length === 0) throw cantSendEmptyMessageError();
-      await channel.send(content, { files: attachments.map(f => f.url) });
+      await channel.send({ content, files: attachments.map(f => f.url) });
       await msg.delete();
     },
   },
@@ -393,9 +457,13 @@ const commandLibrary: Record<string, CommandHandler> = {
       ({ remainder, arg: channelArg } = readNextArg(remainder));
       const channel = await parseTextChannel(channelArg);
 
-      const attachments = msg.attachments.array();
+      if (!channel) {
+        return;
+      }
+
+      const attachments = [...msg.attachments.values()];
       if (remainder.length === 0 && attachments.length === 0) throw cantSendEmptyMessageError();
-      await channel.send(remainder, { files: attachments.map(f => f.url) });
+      await channel.send({ content: remainder, files: attachments.map(f => f.url) });
     },
   },
   sendu: {
@@ -409,10 +477,10 @@ const commandLibrary: Record<string, CommandHandler> = {
       ({ remainder, arg: userArg } = readNextArg(remainder));
       const user = await parseUser(userArg);
 
-      const attachments = msg.attachments.array();
+      const attachments = [...msg.attachments.values()];
       if (remainder.length === 0 && attachments.length === 0) throw cantSendEmptyMessageError();
       const channel = await user.createDM();
-      await channel.send(remainder, { files: attachments.map(f => f.url) });
+      await channel.send({ content: remainder, files: attachments.map(f => f.url) });
     },
   },
   ssend: {
@@ -424,10 +492,10 @@ const commandLibrary: Record<string, CommandHandler> = {
       if (content.startsWith('<#')) {
         let channelArg;
         ({ remainder: content, arg: channelArg } = readNextArg(content));
-        channel = await parseTextChannel(channelArg);
+        channel = (await parseTextChannel(channelArg))!;
       }
       const { content: txt, options } = await parseMessageAdvancedArgs(content, msg);
-      await channel.send(txt, options);
+      await channel.send({ ...options, content: txt! } as any);
     },
   },
   sedit: {
@@ -441,7 +509,7 @@ const commandLibrary: Record<string, CommandHandler> = {
 
       ({ remainder: content, arg: arg1 } = readNextArg(content));
       if (arg1.startsWith('<#')) {
-        channel = await parseTextChannel(arg1);
+        channel = (await parseTextChannel(arg1))!;
         ({ remainder: content, arg: messageArg } = readNextArg(content));
       } else {
         messageArg = arg1;
@@ -449,7 +517,7 @@ const commandLibrary: Record<string, CommandHandler> = {
 
       const message = await channel.messages.fetch(messageArg);
       const { content: txt, options } = await parseMessageAdvancedArgs(content, msg, message);
-      message.edit(txt, options);
+      await message.edit({ ...options, content: txt! } as any);
     },
   },
   news: {
@@ -475,14 +543,16 @@ const commandLibrary: Record<string, CommandHandler> = {
         ({ remainder: basicArgs, arg: colorArg } = readNextArg(basicArgs));
       }
 
-      const embed = new MessageEmbed()
+      const embed = new EmbedBuilder()
         .setTitle(title)
         .setTimestamp(new Date())
-        .setFooter('anime@UTS')
-        .setAuthor(
-          msg.member?.displayName ?? msg.author.username,
-          msg.author.displayAvatarURL({ format: 'png' }),
-        );
+        .setFooter({
+          text: 'anime@UTS',
+        })
+        .setAuthor({
+          name: msg.member?.displayName ?? msg.author.username,
+          iconURL: msg.author.displayAvatarURL({ extension: 'png' }),
+        });
 
       if (linkArg !== undefined) {
         embed.setURL(parseUrl(linkArg));
@@ -490,15 +560,16 @@ const commandLibrary: Record<string, CommandHandler> = {
 
       embed.setDescription(content);
 
-      embed.setColor(colorArg ?? '0099ff');
+      let color = colorArg ?? '0099ff';
+      embed.setColor(parseInt(color, 16));
 
-      const attachments = msg.attachments.array();
+      const attachments = [...msg.attachments.values()];
       if (attachments.length > 0) {
         embed.setImage(attachments[0].url);
       }
 
-      const channel = await parseTextChannel(channelArg);
-      channel.send(embed);
+      const channel = (await parseTextChannel(channelArg))!;
+      await channel.send({ embeds: [embed] });
     },
   },
 };
@@ -515,7 +586,7 @@ client.on('ready', async () => {
   console.log('Logged in!');
 });
 
-client.on('message', async msg => {
+client.on('messageCreate', async msg => {
   if (msg.author.bot) return;
 
   const content = msg.content;
